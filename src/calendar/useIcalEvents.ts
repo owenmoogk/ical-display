@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { fetchIcal } from './fetchIcal';
-import { parseIcalEvents } from './parseIcal';
+import { fetchGoogleCalendarEvents } from './fetchIcal';
 import type {
   CalendarEvent,
   CalendarRange,
@@ -17,26 +16,22 @@ export function useIcalEvents(
   events: CalendarEvent[];
   statuses: Record<string, FeedStatus>;
 } {
-  const [feeds, setFeeds] = useState<Record<string, string>>({});
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [statuses, setStatuses] = useState<Record<string, FeedStatus>>({});
 
-  const sourceKey = sources
-    .map((source) => `${source.id}\n${source.url}`)
-    .join('\0');
+  const sourcesJson = JSON.stringify(sources);
+  const currentSources = useMemo(
+    () => JSON.parse(sourcesJson) as CalendarSource[],
+    [sourcesJson]
+  );
 
   useEffect(() => {
     let cancelled = false;
-
-    const currentSources = sourceKey
-      ? sourceKey.split('\0').map((entry) => {
-          const [id, ...urlParts] = entry.split('\n');
-          return { id, url: urlParts.join('\n') };
-        })
-      : [];
+    const controller = new AbortController();
 
     async function loadFeeds(): Promise<void> {
       if (currentSources.length === 0) {
-        setFeeds({});
+        setEvents([]);
         setStatuses({});
         return;
       }
@@ -48,19 +43,26 @@ export function useIcalEvents(
         )
       );
 
-      const nextFeeds: Record<string, string> = {};
+      const nextEvents: CalendarEvent[] = [];
       const nextStatuses: Record<string, FeedStatus> = {};
 
-      // Fetch all feeds in parallel
+      // Fetch all calendars in parallel.
       await Promise.all(
         currentSources.map(async (source) => {
           try {
-            const text = await fetchIcal(source.url);
+            const fetchedEvents = await fetchGoogleCalendarEvents(
+              source,
+              range,
+              controller.signal
+            );
             if (!cancelled) {
-              nextFeeds[source.id] = text;
+              nextEvents.push(...fetchedEvents);
               nextStatuses[source.id] = { loading: false };
             }
           } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') {
+              return;
+            }
             if (!cancelled) {
               nextStatuses[source.id] = {
                 loading: false,
@@ -76,8 +78,8 @@ export function useIcalEvents(
 
       if (cancelled) return;
 
-      // Single atomic update guarantees all feeds are merged into state together
-      setFeeds(nextFeeds);
+      // A single atomic update keeps all calendar results in sync.
+      setEvents(nextEvents);
       setStatuses(nextStatuses);
     }
 
@@ -85,30 +87,9 @@ export function useIcalEvents(
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
-  }, [refreshKey, sourceKey]);
-
-  const events = useMemo(() => {
-    return sources.flatMap((source) => {
-      const text = feeds[source.id];
-      if (!text) return [];
-
-      try {
-        const parsedEvents = parseIcalEvents(text, source, range);
-        return parsedEvents.map((event) => ({
-          ...event,
-          sourceId: source.id,
-          id: `${source.id}-${event.id ?? ''}`, // Unique ID prevents React key collisions
-        }));
-      } catch (error) {
-        console.error(
-          `Failed to parse iCal feed for source: ${source.id}`,
-          error
-        );
-        return [];
-      }
-    });
-  }, [feeds, range, sources]);
+  }, [currentSources, range, refreshKey]);
 
   return { events, statuses };
 }

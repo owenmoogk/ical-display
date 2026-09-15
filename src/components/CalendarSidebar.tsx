@@ -70,7 +70,7 @@ export function CalendarSidebar({
       <Stack gap="sm" style={{ flex: 1, overflow: 'auto' }}>
         {sources.length === 0 ? (
           <Text size="sm" c="dimmed">
-            No calendars yet. Paste a Google/Outlook iCal URL below.
+            No calendars yet. Paste a public Google Calendar URL below.
           </Text>
         ) : (
           sources.map((source) => {

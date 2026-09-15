@@ -74,7 +74,7 @@ export function AddCalendarModal({
           swatchesPerRow={5}
         />
         <TextInput
-          label="iCal URL"
+          label="Google Calendar URL"
           placeholder="https://calendar.google.com/calendar/ical/..."
           value={url}
           onChange={(event) => setUrl(event.currentTarget.value)}
@@ -89,7 +89,7 @@ export function AddCalendarModal({
             Cancel
           </Button>
           <Button onClick={handleAdd} disabled={!url.trim()}>
-            Add iCal link
+            Add calendar
           </Button>
         </Group>
       </Stack>

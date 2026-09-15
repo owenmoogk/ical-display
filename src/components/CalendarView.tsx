@@ -1,5 +1,5 @@
 import { Box, Modal, Text } from '@mantine/core';
-import { format, getDay, parse, startOfWeek } from 'date-fns';
+import { addDays, format, getDay, parse, startOfWeek } from 'date-fns';
 import { enUS } from 'date-fns/locale/en-US';
 import { useMemo, useState } from 'react';
 import type { View } from 'react-big-calendar';
@@ -29,7 +29,7 @@ function rangeFromValue(
 ): CalendarRange {
   if (Array.isArray(value)) {
     const start = value[0] ?? new Date();
-    const end = value[value.length - 1] ?? start;
+    const end = addDays(value[value.length - 1] ?? start, 1);
     return { start, end };
   }
   return { start: value.start, end: value.end };

@@ -1,3 +1,5 @@
+import type { CalendarEvent, CalendarRange, CalendarSource } from './types';
+
 const GOOGLE_API_KEY = 'AIzaSyBQ9865FeBx6huQBxUlQ083XyP8giU1G-A';
 
 interface GoogleCalendarEventTime {
@@ -9,13 +11,11 @@ interface GoogleCalendarEventTime {
 interface GoogleCalendarEvent {
   id: string;
   status?: string;
-  created?: string;
   summary?: string;
   description?: string;
   location?: string;
   start?: GoogleCalendarEventTime;
   end?: GoogleCalendarEventTime;
-  recurrence?: string[];
 }
 
 interface GoogleCalendarEventsResponse {
@@ -39,58 +39,52 @@ function extractCalendarId(rawUrl: string): string {
   return trimmed;
 }
 
-function formatIcalDate(dateStr?: string): string {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+function toDate(value: GoogleCalendarEventTime | undefined): Date | null {
+  if (value?.dateTime) return new Date(value.dateTime);
+  if (value?.date) return new Date(`${value.date}T00:00:00`);
+  return null;
 }
 
-function jsonToIcal(items: GoogleCalendarEvent[]): string {
-  const ics: string[] = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Google Inc//Google Calendar//EN',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-  ];
+function toCalendarEvent(
+  item: GoogleCalendarEvent,
+  source: CalendarSource
+): CalendarEvent | null {
+  const start = toDate(item.start);
+  const end = toDate(item.end);
 
-  for (const item of items) {
-    if (item.status === 'cancelled') continue;
-
-    ics.push('BEGIN:VEVENT');
-    ics.push(`UID:${item.id}`);
-
-    if (item.created) ics.push(`DTSTAMP:${formatIcalDate(item.created)}`);
-    if (item.start?.dateTime)
-      ics.push(`DTSTART:${formatIcalDate(item.start.dateTime)}`);
-    if (item.start?.date)
-      ics.push(`DTSTART;VALUE=DATE:${item.start.date.replace(/-/g, '')}`);
-    if (item.end?.dateTime)
-      ics.push(`DTEND:${formatIcalDate(item.end.dateTime)}`);
-    if (item.end?.date)
-      ics.push(`DTEND;VALUE=DATE:${item.end.date.replace(/-/g, '')}`);
-
-    if (item.summary) ics.push(`SUMMARY:${item.summary}`);
-    if (item.description)
-      ics.push(`DESCRIPTION:${item.description.replace(/\n/g, '\\n')}`);
-    if (item.location) ics.push(`LOCATION:${item.location}`);
-
-    // Preserves recurring event rules (RRULE)
-    if (item.recurrence) {
-      for (const rule of item.recurrence) {
-        ics.push(rule);
-      }
-    }
-
-    ics.push('END:VEVENT');
+  if (
+    !start ||
+    !end ||
+    Number.isNaN(start.getTime()) ||
+    Number.isNaN(end.getTime())
+  ) {
+    return null;
   }
 
-  ics.push('END:VCALENDAR');
-  return ics.join('\r\n');
+  return {
+    id: `${source.id}-${item.id}`,
+    title: item.summary || 'Busy',
+    start,
+    end,
+    allDay: Boolean(item.start?.date),
+    color: source.color,
+    calendarName: source.name,
+    description: item.description || '',
+    location: item.location || '',
+    sourceId: source.id,
+  };
 }
 
-export async function fetchIcal(rawUrl: string): Promise<string> {
-  const calendarId = extractCalendarId(rawUrl);
+export async function fetchGoogleCalendarEvents(
+  source: CalendarSource,
+  range: CalendarRange,
+  signal?: AbortSignal
+): Promise<CalendarEvent[]> {
+  if (range.start >= range.end) {
+    throw new Error('Invalid calendar range');
+  }
+
+  const calendarId = extractCalendarId(source.url);
   if (!calendarId) {
     throw new Error('Enter a valid Google Calendar ID or URL');
   }
@@ -100,15 +94,24 @@ export async function fetchIcal(rawUrl: string): Promise<string> {
 
   // Loop to handle API pagination so no events are ever dropped
   do {
-    let apiUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
-      calendarId
-    )}/events?key=${GOOGLE_API_KEY}&maxResults=2500&singleEvents=false`;
+    const params = new URLSearchParams({
+      key: GOOGLE_API_KEY,
+      maxResults: '2500',
+      orderBy: 'startTime',
+      singleEvents: 'true',
+      timeMax: range.end.toISOString(),
+      timeMin: range.start.toISOString(),
+    });
 
     if (pageToken) {
-      apiUrl += `&pageToken=${encodeURIComponent(pageToken)}`;
+      params.set('pageToken', pageToken);
     }
 
-    const response = await fetch(apiUrl);
+    const apiUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+      calendarId
+    )}/events?${params.toString()}`;
+
+    const response = await fetch(apiUrl, { signal });
 
     if (!response.ok) {
       if (response.status === 404 || response.status === 403) {
@@ -128,5 +131,9 @@ export async function fetchIcal(rawUrl: string): Promise<string> {
     pageToken = data.nextPageToken;
   } while (pageToken);
 
-  return jsonToIcal(allItems);
+  return allItems.flatMap((item) => {
+    if (item.status === 'cancelled') return [];
+    const event = toCalendarEvent(item, source);
+    return event ? [event] : [];
+  });
 }

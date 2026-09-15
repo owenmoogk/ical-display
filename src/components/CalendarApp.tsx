@@ -174,9 +174,9 @@ export function CalendarApp() {
               <Box m="auto" ta="center" maw={480}>
                 <Title order={2}>Add calendars to get started</Title>
                 <Text c="dimmed">
-                  Use the sidebar to paste iCal links for each person. The URL
-                  updates as you go — copy it to share this view, including
-                  colors. Add{' '}
+                  Use the sidebar to paste public Google Calendar links for
+                  person. The URL updates as you go — copy it to share this
+                  view, including colors. Add{' '}
                   <Text span ff="monospace">
                     embed=1
                   </Text>{' '}

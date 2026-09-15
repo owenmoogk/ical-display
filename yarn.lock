@@ -2219,11 +2219,6 @@ hasown@^2.0.2:
   dependencies:
     function-bind "^1.1.2"
 
-ical.js@^2.2.1:
-  version "2.2.1"
-  resolved "https://registry.yarnpkg.com/ical.js/-/ical.js-2.2.1.tgz#f06fe9b32498d948893ec994e6964379dac6a907"
-  integrity sha512-yK/UlPbEs316igb/tjRgbFA8ZV75rCsBJp/hWOatpyaPNlgw0dGDmU+FoicOcwX4xXkeXOkYiOmCqNPFpNPkQg==
-
 ignore@^5.2.0:
   version "5.3.2"
   resolved "https://registry.yarnpkg.com/ignore/-/ignore-5.3.2.tgz#3cd40e729f3643fd87cb04e50bf0eb722bc596f5"
