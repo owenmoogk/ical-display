@@ -83,15 +83,47 @@
 .legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 12px;
+  align-items: center;
+  gap: 4px 6px;
   margin-top: 10px;
 }
 
 .legendItem {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  margin: 0;
+  padding: 3px 8px 3px 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.legendItem:hover {
+  background: light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5));
+}
+
+.legendItem:focus-visible {
+  outline: 2px solid var(--mantine-color-blue-filled);
+  outline-offset: 1px;
+}
+
+.legendItem[data-state='off'] {
+  opacity: 0.55;
+}
+
+.legendItem[data-state='mixed'] {
+  background: light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-6));
+}
+
+.swatches {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .swatch {

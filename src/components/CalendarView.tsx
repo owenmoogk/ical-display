@@ -1,4 +1,11 @@
-import { Box, Modal, Text } from '@mantine/core';
+import {
+  Box,
+  Button,
+  Modal,
+  Text,
+  Tooltip,
+  UnstyledButton,
+} from '@mantine/core';
 import { addDays, format, getDay, parse, startOfWeek } from 'date-fns';
 import { enUS } from 'date-fns/locale/en-US';
 import { useMemo, useState } from 'react';
@@ -13,6 +20,14 @@ import type {
   CalendarRange,
   CalendarSource,
 } from '../calendar/types';
+import type { VisibilityState } from '../calendar/visibility';
+import {
+  anyHidden,
+  buildLegendGroups,
+  legendAriaLabel,
+  legendTooltip,
+  visibilityState,
+} from '../calendar/visibility';
 
 import classes from './CalendarView.module.css';
 
@@ -35,20 +50,38 @@ function rangeFromValue(
   return { start: value.start, end: value.end };
 }
 
+function ariaPressed(state: VisibilityState): boolean | 'mixed' {
+  if (state === 'on') {
+    return true;
+  }
+  if (state === 'off') {
+    return false;
+  }
+  return 'mixed';
+}
+
 type CalendarViewProps = {
   events: CalendarEvent[];
+  hidden: readonly boolean[];
   onRangeChange: (range: CalendarRange) => void;
+  onShowAll: () => void;
+  onToggleSources: (indices: number[]) => void;
   sources: CalendarSource[];
 };
 
 export function CalendarView({
   events,
+  hidden,
   onRangeChange,
+  onShowAll,
+  onToggleSources,
   sources,
 }: CalendarViewProps) {
   const [view, setView] = useState<View>('week');
   const [date, setDate] = useState(new Date());
   const [selected, setSelected] = useState<CalendarEvent | null>(null);
+  const groups = useMemo(() => buildLegendGroups(sources), [sources]);
+  const showAll = anyHidden(sources.length, hidden);
 
   const eventPropGetter = useMemo(
     () => (event: CalendarEvent) => ({
@@ -86,16 +119,70 @@ export function CalendarView({
         />
       </Box>
       {sources.length > 0 && (
-        <Box className={classes.legend}>
-          {sources.map((source) => (
-            <Box key={source.id} className={classes.legendItem}>
-              <Box
-                className={classes.swatch}
-                style={{ backgroundColor: source.color }}
-              />
-              <Text size="sm">{source.name || source.url}</Text>
-            </Box>
-          ))}
+        <Box
+          className={classes.legend}
+          role="group"
+          aria-label="Show or hide calendars"
+        >
+          {groups.map((group) => {
+            const state = visibilityState(group.indices, hidden);
+            const tooltip = legendTooltip(group);
+            return (
+              <Tooltip
+                key={group.indices.join('-')}
+                label={tooltip ?? group.label}
+                disabled={tooltip === null}
+                openDelay={300}
+              >
+                <UnstyledButton
+                  type="button"
+                  className={classes.legendItem}
+                  data-state={state}
+                  aria-pressed={ariaPressed(state)}
+                  aria-label={legendAriaLabel(group)}
+                  onClick={() => {
+                    onToggleSources(group.indices);
+                  }}
+                >
+                  <span className={classes.swatches}>
+                    {group.colors.map((color) => (
+                      <span
+                        key={color}
+                        className={classes.swatch}
+                        style={
+                          state === 'off'
+                            ? {
+                                backgroundColor: 'transparent',
+                                boxShadow: `inset 0 0 0 1.5px ${color}`,
+                              }
+                            : { backgroundColor: color }
+                        }
+                      />
+                    ))}
+                  </span>
+                  <Text
+                    component="span"
+                    size="sm"
+                    td={state === 'off' ? 'line-through' : undefined}
+                    c={state === 'on' ? undefined : 'dimmed'}
+                  >
+                    {group.label}
+                  </Text>
+                </UnstyledButton>
+              </Tooltip>
+            );
+          })}
+          {showAll ? (
+            <Button
+              type="button"
+              variant="subtle"
+              size="compact-xs"
+              color="gray"
+              onClick={onShowAll}
+            >
+              Show all
+            </Button>
+          ) : null}
         </Box>
       )}
       <Modal

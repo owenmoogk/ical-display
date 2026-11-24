@@ -20,6 +20,7 @@ import { useSearchParams } from 'react-router-dom';
 import { nextCalendarColor } from '../calendar/colors';
 import type { CalendarRange, CalendarSource } from '../calendar/types';
 import { useIcalEvents, useRefreshKey } from '../calendar/useIcalEvents';
+import { anyHidden } from '../calendar/visibility';
 import {
   CALS_PARAM,
   decodeCalendars,
@@ -55,8 +56,35 @@ export function CalendarApp() {
     () => decodeCalendars(searchParams.get(CALS_PARAM)),
     [searchParams]
   );
+  // Visibility is session state on purpose. Toggles must not rewrite
+  // `#/?cals=` share links, including embed=1 permalinks.
+  const [hidden, setHidden] = useState<readonly boolean[]>([]);
 
   const { events, statuses } = useIcalEvents(sources, range, refreshKey);
+  const visibleEvents = useMemo(() => {
+    if (!anyHidden(sources.length, hidden)) {
+      return events;
+    }
+    const visibleIds = new Set(
+      sources.filter((_, index) => !hidden[index]).map((source) => source.id)
+    );
+    return events.filter((event) => visibleIds.has(event.sourceId));
+  }, [events, hidden, sources]);
+
+  const toggleIndices = (indices: number[]): void => {
+    setHidden((current) => {
+      const flags = sources.map((_, index) => Boolean(current[index]));
+      const shouldHide = indices.every((index) => !flags[index]);
+      for (const index of indices) {
+        flags[index] = shouldHide;
+      }
+      return flags;
+    });
+  };
+
+  const showAll = (): void => {
+    setHidden([]);
+  };
 
   const updateSources = (next: CalendarSource[]): void => {
     setSearchParams(
@@ -90,7 +118,7 @@ export function CalendarApp() {
       <AppShell
         header={{ height: embed ? 0 : 56 }}
         navbar={{
-          width: 360,
+          width: 400,
           breakpoint: 'md',
           collapsed: { mobile: !navbarOpened, desktop: embed },
         }}
@@ -134,6 +162,7 @@ export function CalendarApp() {
           <AppShell.Navbar p="md">
             <CalendarSidebar
               sources={sources}
+              hidden={hidden}
               statuses={statuses}
               shareUrl={shareUrl}
               embedUrl={embedUrl}
@@ -151,7 +180,16 @@ export function CalendarApp() {
                 close();
               }}
               onRemove={(id) => {
+                const index = sources.findIndex((source) => source.id === id);
+                if (index !== -1) {
+                  setHidden((current) =>
+                    current.filter((_, flagIndex) => flagIndex !== index)
+                  );
+                }
                 updateSources(sources.filter((source) => source.id !== id));
+              }}
+              onToggleVisibility={(index) => {
+                toggleIndices([index]);
               }}
               onUpdate={(id, patch) => {
                 updateSources(
@@ -185,9 +223,12 @@ export function CalendarApp() {
               </Box>
             ) : (
               <CalendarView
-                events={events}
+                events={visibleEvents}
                 sources={sources}
+                hidden={hidden}
                 onRangeChange={setRange}
+                onShowAll={showAll}
+                onToggleSources={toggleIndices}
               />
             )}
           </Flex>
