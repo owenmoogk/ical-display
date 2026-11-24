@@ -10,19 +10,21 @@ import {
   TextInput,
   Tooltip,
 } from '@mantine/core';
-import { FiPlus, FiTrash2 } from 'react-icons/fi';
+import { useDisclosure } from '@mantine/hooks';
+import { FiEye, FiEyeOff, FiPlus, FiTrash2 } from 'react-icons/fi';
 import { IoCopyOutline } from 'react-icons/io5';
 import { MdCheck } from 'react-icons/md';
 
 import { CALENDAR_COLORS } from '../calendar/colors';
 import type { CalendarSource, FeedStatus } from '../calendar/types';
 import { AddCalendarModal } from './AddCalendarModal';
-import { useDisclosure } from '@mantine/hooks';
 
 type CalendarSidebarProps = {
   embedUrl: string;
+  hidden: readonly boolean[];
   onAdd: (source: Omit<CalendarSource, 'id'>) => void;
   onRemove: (id: string) => void;
+  onToggleVisibility: (index: number) => void;
   onUpdate: (id: string, patch: Partial<Omit<CalendarSource, 'id'>>) => void;
   shareUrl: string;
   sources: CalendarSource[];
@@ -31,8 +33,10 @@ type CalendarSidebarProps = {
 
 export function CalendarSidebar({
   embedUrl,
+  hidden,
   onAdd,
   onRemove,
+  onToggleVisibility,
   onUpdate,
   shareUrl,
   sources,
@@ -73,49 +77,71 @@ export function CalendarSidebar({
             No calendars yet. Paste a public Google Calendar URL below.
           </Text>
         ) : (
-          sources.map((source) => {
+          sources.map((source, index) => {
             const status = statuses[source.id];
+            const isHidden = hidden[index];
+            const label = source.name.trim() || 'calendar';
             return (
-              <Group
-                justify="space-between"
-                wrap="nowrap"
-                align="flex-start"
-                key={source.id}
-              >
-                <TextInput
-                  value={source.name}
-                  onChange={(event) => {
-                    onUpdate(source.id, { name: event.currentTarget.value });
-                  }}
-                  style={{ flex: 1 }}
-                />
-                <ColorInput
-                  value={source.color}
-                  styles={{
-                    input: {
-                      color: 'transparent', // Hides the text characters
-                      textSelectionColor: 'transparent',
-                    },
-                  }}
-                  onChange={(value) => {
-                    onUpdate(source.id, { color: value });
-                  }}
-                  swatches={CALENDAR_COLORS}
-                  swatchesPerRow={5}
-                  w={100}
-                />
-                <Tooltip label="Remove">
-                  <ActionIcon
-                    color="red"
-                    variant="subtle"
-                    onClick={() => {
-                      onRemove(source.id);
+              <Stack key={source.id} gap={4}>
+                <Group
+                  justify="space-between"
+                  wrap="nowrap"
+                  align="flex-start"
+                  gap={6}
+                >
+                  <TextInput
+                    value={source.name}
+                    aria-label={`Name for ${label}`}
+                    onChange={(event) => {
+                      onUpdate(source.id, { name: event.currentTarget.value });
                     }}
-                  >
-                    <FiTrash2 />
-                  </ActionIcon>
-                </Tooltip>
-
+                    style={{ flex: 1, opacity: isHidden ? 0.45 : 1 }}
+                  />
+                  <ColorInput
+                    value={source.color}
+                    aria-label={`Color for ${label}`}
+                    styles={{
+                      input: {
+                        color: 'transparent', // Hides the text characters
+                        textSelectionColor: 'transparent',
+                      },
+                    }}
+                    onChange={(value) => {
+                      onUpdate(source.id, { color: value });
+                    }}
+                    swatches={CALENDAR_COLORS}
+                    swatchesPerRow={5}
+                    w={74}
+                    style={{ opacity: isHidden ? 0.45 : 1, flexShrink: 0 }}
+                  />
+                  <Tooltip label={isHidden ? 'Show calendar' : 'Hide calendar'}>
+                    <ActionIcon
+                      type="button"
+                      variant={isHidden ? 'light' : 'subtle'}
+                      color={isHidden ? 'gray' : 'blue'}
+                      aria-pressed={!isHidden}
+                      aria-label={isHidden ? `Show ${label}` : `Hide ${label}`}
+                      onClick={() => {
+                        onToggleVisibility(index);
+                      }}
+                    >
+                      {isHidden ? <FiEyeOff /> : <FiEye />}
+                    </ActionIcon>
+                  </Tooltip>
+                  <Tooltip label="Remove">
+                    <ActionIcon
+                      type="button"
+                      color="red"
+                      variant="subtle"
+                      aria-label={`Remove ${label}`}
+                      onClick={() => {
+                        onRemove(source.id);
+                      }}
+                    >
+                      <FiTrash2 />
+                    </ActionIcon>
+                  </Tooltip>
+                </Group>
                 {status?.loading ? (
                   <Text size="xs" c="dimmed">
                     Loading events…
@@ -126,7 +152,7 @@ export function CalendarSidebar({
                     {status.error}
                   </Text>
                 ) : null}
-              </Group>
+              </Stack>
             );
           })
         )}
