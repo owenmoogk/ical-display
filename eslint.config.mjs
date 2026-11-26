@@ -9,16 +9,14 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 
+const tsProjects = [
+  './shared/tsconfig.json',
+  './backend/tsconfig.json',
+  './frontend/tsconfig.json',
+];
+
 export default [
   js.configs.recommended,
-  {
-    ...reactPlugin.configs.flat.recommended,
-    settings: {
-      react: {
-        version: 'detect',
-      },
-    },
-  },
   importPlugin.flatConfigs.recommended,
   typescriptEslint.configs.eslintRecommended,
   prettierPluginRecommended,
@@ -33,22 +31,19 @@ export default [
     ignores: ['**/node_modules/', '**/build/', '**/dist/', '**/*d.ts'],
   },
 
+  // shared rules for every TypeScript file
   {
     files: ['**/*.ts', '**/*.tsx'],
 
     plugins: {
       '@typescript-eslint': typescriptEslintPlugin,
-      'react-hooks': reactHooksPlugin,
     },
 
     languageOptions: {
       parser: typescriptParser,
       parserOptions: {
-        project: './tsconfig.json',
-      },
-      globals: {
-        ...globals.browser,
-        __dirname: 'readonly',
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
       },
     },
 
@@ -56,8 +51,67 @@ export default [
       'import/resolver': {
         typescript: {
           alwaysTryTypes: true,
-          project: './tsconfig.json',
+          project: tsProjects,
+          noWarnOnMultipleProjects: true,
         },
+      },
+    },
+
+    rules: {
+      // typescript eslint
+      '@typescript-eslint/consistent-type-imports': 'error',
+      '@typescript-eslint/no-confusing-void-expression': 'off',
+      '@typescript-eslint/member-ordering': 'error',
+      '@typescript-eslint/promise-function-async': 'error',
+      '@typescript-eslint/restrict-template-expressions': [
+        'error',
+        { allowNumber: true },
+      ],
+
+      'import/no-named-as-default': 'error',
+
+      // javascript
+      'no-useless-return': 'error',
+      eqeqeq: 'error',
+      'no-var': 'error',
+      'prefer-const': 'error',
+      'prefer-promise-reject-errors': 'error',
+      'prefer-regex-literals': 'error',
+      radix: 'error',
+    },
+  },
+
+  // backend + shared: node
+  {
+    files: ['backend/**/*.ts', 'shared/**/*.ts'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+    rules: {
+      'no-console': 'off',
+    },
+  },
+
+  // frontend: react in the browser
+  {
+    ...reactPlugin.configs.flat.recommended,
+    files: ['frontend/**/*.tsx', 'frontend/**/*.ts'],
+    settings: {
+      react: {
+        version: 'detect',
+      },
+    },
+  },
+  {
+    files: ['frontend/**/*.tsx', 'frontend/**/*.ts'],
+
+    plugins: {
+      'react-hooks': reactHooksPlugin,
+    },
+
+    languageOptions: {
+      globals: {
+        ...globals.browser,
       },
     },
 
@@ -65,12 +119,6 @@ export default [
       // for some reason, these can't be applied at top level
       ...reactHooksPlugin.configs.recommended.rules,
       'react-hooks/exhaustive-deps': 'error',
-
-      // typescript eslint
-      '@typescript-eslint/consistent-type-imports': 'error',
-      '@typescript-eslint/no-confusing-void-expression': 'off',
-      '@typescript-eslint/member-ordering': 'error',
-      '@typescript-eslint/promise-function-async': 'error',
 
       // react
       'react/react-in-jsx-scope': 'off',
@@ -94,17 +142,20 @@ export default [
       ],
       'react/self-closing-comp': 'error',
 
-      'import/no-named-as-default': 'error',
-
-      // javascript
-      'no-useless-return': 'error',
-      eqeqeq: 'error',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
-      'no-var': 'error',
-      'prefer-const': 'error',
-      'prefer-promise-reject-errors': 'error',
-      'prefer-regex-literals': 'error',
-      radix: 'error',
+    },
+  },
+
+  // plain JS config files (eslint-plugin-import pins ecmaVersion 2018, which rejects import.meta)
+  {
+    files: ['**/*.mjs'],
+    languageOptions: { ecmaVersion: 'latest', sourceType: 'module' },
+  },
+  {
+    files: ['**/*.cjs'],
+    languageOptions: {
+      globals: { ...globals.node },
+      sourceType: 'commonjs',
     },
   },
 ];

@@ -1,0 +1,47 @@
+# Runs on the server from ~/ical-display. CI sends this file and secrets.env with each
+# deploy (see backend/deploy/deploy.sh); TAG, APP_UID and APP_GID come from ~/ical-display/.env.
+name: ical-display
+
+services:
+  backend:
+    image: ghcr.io/owenmoogk/ical-display:${TAG:?set TAG in .env}
+    restart: unless-stopped
+    init: true
+    # Listens on 127.0.0.1:8789 on the host's network, where cloudflared reaches it.
+    network_mode: host
+    # Run as the owner of ./data so files it writes stay editable on the host.
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"
+    # SESSION_KEY and GITHUB_APP_CLIENT_SECRET, written by each deploy from the repo's
+    # GitHub secrets (see the deploy-backend job in ci.yml).
+    env_file:
+      - path: ./secrets.env
+        format: raw
+    environment:
+      PORT: "8789"
+      HOST: 127.0.0.1
+      PUBLIC_URL: https://ical.owenmoogk.com
+      FRONTEND_URL: https://owenmoogk.com/ical-display/
+      # Client ID of the ical-display GitHub App (not secret). Fill in after creating it.
+      GITHUB_APP_CLIENT_ID: Ov23liHF7n8vjj3f8P3f
+      # State the server writes: calendars.json (the only copy) and sessions.enc.
+      # Backed up nightly to the NAS by the homelab repo's backup script.
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    # Stay out of the way of anything else on the box (e.g. a game server).
+    cpus: 0.5
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8789/healthz').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: "3" }

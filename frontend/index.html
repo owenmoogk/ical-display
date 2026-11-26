@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Share color-coded iCal calendars in one view" />
+  <meta name="title" property="og:title" content="Shared Calendars" />
+  <link rel="icon" href="/ical-display/favicon.svg" />
+  <title>Shared Calendars</title>
+  <!--
+    GitHub Pages has no SPA fallback: public/404.html turns /ical-display/owner/cal
+    into /ical-display/?/owner/cal, and this puts the real path back before the app loads.
+    (https://github.com/rafgraph/spa-github-pages)
+  -->
+  <script type="text/javascript">
+    (function (l) {
+      if (l.search[1] === '/') {
+        var decoded = l.search.slice(1).split('&').map(function (s) {
+          return s.replace(/~and~/g, '&');
+        }).join('?');
+        window.history.replaceState(null, null, l.pathname.slice(0, -1) + decoded + l.hash);
+      }
+    })(window.location);
+  </script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>
